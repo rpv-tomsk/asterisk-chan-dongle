@@ -1,14 +1,10 @@
 /*
    Copyright (C) 2010 bg <bg_one@mail.ru>
 */
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif /* HAVE_CONFIG_H */
-
 #include "dc_config.h"
 #include <asterisk/callerid.h>				/* ast_parse_caller_presentation() */
 
-static struct ast_jb_conf jbconf_default = 
+static struct ast_jb_conf jbconf_default =
 {
 	.flags			= 0,
 	.max_size		= -1,
@@ -22,7 +18,7 @@ static const char * const dtmf_values[] = { "off", "inband", "relax" };
 
 EXPORT_DEF int dc_dtmf_str2setting(const char * value)
 {
-    return str2enum(value, dtmf_values, ITEMS_OF(dtmf_values));
+	return str2enum(value, dtmf_values, ITEMS_OF(dtmf_values));
 }
 
 EXPORT_DEF const char * dc_dtmf_setting2str(dc_dtmf_setting_t dtmf)

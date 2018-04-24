@@ -1,24 +1,23 @@
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif /* HAVE_CONFIG_H */
+/* Required outside the BUILD_APPLICATIONS #ifdef! */
+#include "ast_config.h"
 
 #ifdef BUILD_APPLICATIONS
-/* 
+/*
    Copyright (C) 2009 - 2010
-   
+
    Artem Makhutov <artem@makhutov.org>
    http://www.makhutov.org
-   
+
    Dmitry Vagin <dmitry2004@yandex.ru>
 
    bg <bg_one@mail.ru>
 */
 
-#include <asterisk.h>
 #include <asterisk/app.h>	/* AST_DECLARE_APP_ARGS() ... */
 #include <asterisk/pbx.h>	/* pbx_builtin_setvar_helper() */
 #include <asterisk/module.h>	/* ast_register_application2() ast_unregister_application() */
-#include <asterisk/version.h>	/* ASTERISK_VERSION_NUM */
+
+#include "ast_compat.h"		/* asterisk compatibility fixes */
 
 #include "app.h"		/* app_register() app_unregister() */
 #include "chan_dongle.h"	/* struct pvt */
@@ -114,6 +113,46 @@ static int app_send_sms_exec (attribute_unused struct ast_channel* channel, cons
 	return !status;
 }
 
+static int app_send_ussd_exec(attribute_unused struct ast_channel* channel, const char* data)
+{
+	char* parse;
+	const char* msg;
+	int status;
+	void* msgid;
+
+	AST_DECLARE_APP_ARGS(args,
+		 AST_APP_ARG(device);
+		 AST_APP_ARG(ussd);
+	);
+
+	if (ast_strlen_zero(data))
+	{
+		return -1;
+	}
+
+	parse = ast_strdupa(data);
+
+	AST_STANDARD_APP_ARGS(args, parse);
+
+	if (ast_strlen_zero(args.device))
+	{
+		ast_log(LOG_ERROR, "NULL device for ussd -- USSD will not be sent\n");
+		return -1;
+	}
+
+	if (ast_strlen_zero(args.ussd))
+	{
+		ast_log(LOG_ERROR, "NULL ussd command -- USSD will not be sent\n");
+		return -1;
+	}
+
+	msg = send_ussd(args.device, args.ussd, &status, &msgid);
+	if(!status)
+	{
+		ast_log(LOG_ERROR, "[%s] %s with id %p\n", args.device, msg, msgid);
+	}
+	return !status;
+}
 
 
 static const struct dongle_application
@@ -123,7 +162,7 @@ static const struct dongle_application
 	int		(*func)(struct ast_channel* channel, const char* data);
 	const char*	synopsis;
 	const char*	desc;
-} dca[] = 
+} dca[] =
 {
 	{
 		"DongleStatus",
@@ -137,21 +176,29 @@ static const struct dongle_application
 	{
 		"DongleSendSMS",
 		app_send_sms_exec,
-		"DongleSendSMS(Device,Dest,Message,Validity,Report)", 
+		"DongleSendSMS(Device,Dest,Message,Validity,Report)",
 		"DongleSendSMS(Device,Dest,Message,Validity,Report)\n"
 		"  Device   - Id of device from dongle.conf\n"
 		"  Dest     - destination\n"
 		"  Message  - text of the message\n"
 		"  Validity - Validity period in minutes\n"
 		"  Report   - Boolean flag for report request\n"
+	},
+	{
+		"DongleSendUSSD",
+		app_send_ussd_exec,
+		"DongleSendUSSD(Device,USSD)",
+		"DongleSendUSSD(Device,USSD)\n"
+		"  Device   - Id of device from dongle.conf\n"
+		"  USSD     - ussd command\n"
 	}
 };
 
-#if ASTERISK_VERSION_NUM >= 10800
-typedef int		(*app_func_t)(struct ast_channel* channel, const char * data);
-#else
-typedef int		(*app_func_t)(struct ast_channel* channel, void * data);
-#endif
+#if ASTERISK_VERSION_NUM >= 10800 /* 1.8+ */
+typedef int (*app_func_t)(struct ast_channel *channel, const char *data);
+#else /* 1.8- */
+typedef int (*app_func_t)(struct ast_channel *channel, void *data);
+#endif /* ^1.8- */
 
 #/* */
 EXPORT_DEF void app_register()

@@ -1,9 +1,9 @@
-/* 
+/*
    Copyright (C) 2009 - 2010
-   
+
    Artem Makhutov <artem@makhutov.org>
    http://www.makhutov.org
-   
+
    Dmitry Vagin <dmitry2004@yandex.ru>
 
    bg <bg_one@mail.ru>
@@ -15,11 +15,8 @@
    http://www.makhutov.org
 */
 
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif /* HAVE_CONFIG_H */
+#include "ast_config.h"
 
-#include <asterisk.h>
 #include <asterisk/utils.h>
 
 #include "at_command.h"
@@ -46,7 +43,7 @@ static const char cmd_ddsetex2[] = "AT^DDSETEX=2\r";
 static int at_fill_generic_cmd_va (at_queue_cmd_t * cmd, const char * format, va_list ap)
 {
 	char buf[4096];
-	
+
 	cmd->length = vsnprintf (buf, sizeof(buf)-1, format, ap);
 
 	buf[cmd->length] = 0;
@@ -133,7 +130,7 @@ EXPORT_DEF int at_enque_initialization(struct cpvt* cpvt, at_cmd_t from_command)
 	static const char cmd19[] = "AT+CSSN=1,1\r";
 	static const char cmd21[] = "AT+CSCS=\"UCS2\"\r";
 
-	static const char cmd22[] = "AT+CPMS=\"ME\",\"ME\",\"ME\"\r";
+	static const char cmd22[] = "AT+CPMS=\"SM\",\"SM\",\"SM\"\r";
 	static const char cmd23[] = "AT+CNMI=2,1,0,0,0\r";
 	static const char cmd24[] = "AT+CSQ\r";
 
@@ -247,15 +244,15 @@ EXPORT_DEF int at_enque_pdu(struct cpvt * cpvt, const char * pdu, attribute_unus
 	char * ptr = (char *) pdu;
 	char buf[8+25+1];
 	at_queue_cmd_t at_cmd[] = {
-		{ CMD_AT_CMGS,    RES_SMS_PROMPT, ATQ_CMD_FLAG_DEFAULT, { ATQ_CMD_TIMEOUT_2S, 0}  , NULL, 0 },
-		{ CMD_AT_SMSTEXT, RES_OK,         ATQ_CMD_FLAG_DEFAULT, { ATQ_CMD_TIMEOUT_40S, 0} , NULL, 0 }
+		{ CMD_AT_CMGS,    RES_SMS_PROMPT, ATQ_CMD_FLAG_DEFAULT, { ATQ_CMD_TIMEOUT_MEDIUM, 0}, NULL, 0 },
+		{ CMD_AT_SMSTEXT, RES_OK,         ATQ_CMD_FLAG_DEFAULT, { ATQ_CMD_TIMEOUT_LONG, 0},   NULL, 0 }
 		};
 
 	size_t length = strlen(pdu);
 	size_t pdulen = length;
 
 	int scalen = pdu_parse_sca(&ptr, &pdulen);
-	
+
 	if(scalen < 2 || length % 2 != 0)
 	{
 		return -EINVAL;
@@ -263,7 +260,7 @@ EXPORT_DEF int at_enque_pdu(struct cpvt * cpvt, const char * pdu, attribute_unus
 
 	at_cmd[1].data = ast_malloc(length + 2);
 	if(!at_cmd[1].data)
-	{		
+	{
 		return -ENOMEM;
 	}
 
@@ -272,15 +269,15 @@ EXPORT_DEF int at_enque_pdu(struct cpvt * cpvt, const char * pdu, attribute_unus
 	memcpy(at_cmd[1].data, pdu, length);
 	at_cmd[1].data[length] = 0x1A;
 	at_cmd[1].data[length+1] = 0x0;
-		
+
 	at_cmd[0].length = snprintf(buf, sizeof(buf), "AT+CMGS=%d\r", (int)(pdulen / 2));
 	at_cmd[0].data = ast_strdup(buf);
 	if(!at_cmd[0].data)
 	{
 		ast_free(at_cmd[1].data);
-		return -ENOMEM;		
+		return -ENOMEM;
 	}
-			
+
 /*		ast_debug (5, "[%s] PDU Head '%s'\n", PVT_ID(pvt), buf);
 		ast_debug (5, "[%s] PDU Body '%s'\n", PVT_ID(pvt), at_cmd[1].data);
 */
@@ -300,10 +297,10 @@ EXPORT_DEF int at_enque_sms (struct cpvt* cpvt, const char* destination, const c
 	char buf[1024] = "AT+CMGS=\"";
 	char pdu_buf[2048];
 	pvt_t* pvt = cpvt->pvt;
-	
+
 	at_queue_cmd_t at_cmd[] = {
-		{ CMD_AT_CMGS,    RES_SMS_PROMPT, ATQ_CMD_FLAG_DEFAULT, { ATQ_CMD_TIMEOUT_2S, 0}  , NULL, 0 },
-		{ CMD_AT_SMSTEXT, RES_OK,         ATQ_CMD_FLAG_DEFAULT, { ATQ_CMD_TIMEOUT_40S, 0} , NULL, 0 }
+		{ CMD_AT_CMGS,    RES_SMS_PROMPT, ATQ_CMD_FLAG_DEFAULT, { ATQ_CMD_TIMEOUT_MEDIUM, 0}, NULL, 0 },
+		{ CMD_AT_SMSTEXT, RES_OK,         ATQ_CMD_FLAG_DEFAULT, { ATQ_CMD_TIMEOUT_LONG, 0},   NULL, 0 }
 		};
 
 	if(pvt->use_pdu)
@@ -418,7 +415,7 @@ EXPORT_DEF int at_enque_ussd (struct cpvt * cpvt, const char * code, attribute_u
 	length = STRLEN(cmd);
 
 	if (pvt->cusd_use_7bit_encoding)
-		cusd_encoding = STR_ENCODING_7BIT_HEX;
+		cusd_encoding = STR_ENCODING_7BIT_HEX_PAD_0;
 	else if (pvt->use_ucs2_encoding)
 		cusd_encoding = STR_ENCODING_UCS2_HEX;
 	else
@@ -496,10 +493,10 @@ EXPORT_DEF int at_enque_set_ccwa (struct cpvt* cpvt, attribute_unused const char
 	int err;
 	call_waiting_t value;
 	at_queue_cmd_t cmds[] = {
-		/* 5 seconds timeout */
-		ATQ_CMD_DECLARE_DYNIT(CMD_AT_CCWA_SET, ATQ_CMD_TIMEOUT_15S, 0),				/* Set Call-Waiting On/Off */
-		ATQ_CMD_DECLARE_STIT(CMD_AT_CCWA_STATUS, cmd_ccwa_get, ATQ_CMD_TIMEOUT_15S, 0),		/* Query CCWA Status for Voice Call  */
-
+		/* Set Call-Waiting On/Off */
+		ATQ_CMD_DECLARE_DYNIT(CMD_AT_CCWA_SET, ATQ_CMD_TIMEOUT_MEDIUM, 0),
+		/* Query CCWA Status for Voice Call  */
+		ATQ_CMD_DECLARE_STIT(CMD_AT_CCWA_STATUS, cmd_ccwa_get, ATQ_CMD_TIMEOUT_MEDIUM, 0),
 	};
 	at_queue_cmd_t * pcmd = cmds;
 	unsigned count = ITEMS_OF(cmds);
@@ -655,7 +652,7 @@ EXPORT_DEF int at_enque_activate (struct cpvt* cpvt)
 
 	if (cpvt->state != CALL_STATE_ONHOLD && cpvt->state != CALL_STATE_WAITING)
 	{
-		ast_log (LOG_ERROR, "[%s] Imposible activate call idx %d from state '%s'\n", 
+		ast_log (LOG_ERROR, "[%s] Imposible activate call idx %d from state '%s'\n",
 				PVT_ID(cpvt->pvt), cpvt->call_idx, call_state2str(cpvt->state));
 		return -1;
 	}
@@ -690,7 +687,7 @@ EXPORT_DEF int at_enque_flip_hold (struct cpvt* cpvt)
 EXPORT_DEF int at_enque_ping (struct cpvt * cpvt)
 {
 	static const at_queue_cmd_t cmds[] = {
-		ATQ_CMD_DECLARE_STIT(CMD_AT, cmd_at, ATQ_CMD_TIMEOUT_1S, 0),		/* 1 second timeout */
+		ATQ_CMD_DECLARE_STIT(CMD_AT, cmd_at, ATQ_CMD_TIMEOUT_SHORT, 0),
 		};
 
 	return at_queue_insert_const(cpvt, cmds, ITEMS_OF(cmds), 1);
@@ -811,11 +808,11 @@ EXPORT_DEF int at_enque_hangup (struct cpvt* cpvt, int call_idx)
 		not found yes
 */
 /*
-	static const struct 
+	static const struct
 	{
 		at_cmd_t	cmd;
 		const char	*data;
-	} commands[] = 
+	} commands[] =
 	{
 		{ CMD_AT_CHUP, "AT+CHUP\r" },
 		{ CMD_AT_CHLD_1x, "AT+CHLD=1%d\r" }
